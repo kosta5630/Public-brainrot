@@ -11,26 +11,33 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Move character to the sky and then walk to hitbox
-local function skyAndWalkTo(hitbox)
+-- Send player to Y = 50 and walk toward the target
+local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or not hrp or not hitbox then return end
 
-	-- Send to the sky
-	local skyPos = hrp.Position + Vector3.new(0, 30, 0)
+	-- Send to Y = 50, same X/Z
+	local skyPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
 	hrp.CFrame = CFrame.new(skyPos)
 
-	task.wait(0.5) -- short delay before moving down
+	-- Walk toward hitbox X/Z at same Y height
+	local targetXZ = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
+	humanoid:MoveTo(targetXZ)
 
-	-- Now walk to the hitbox
-	local targetPos = hitbox.Position + Vector3.new(0, 0, 0)
-	if humanoid then
-		humanoid:MoveTo(targetPos)
-	end
+	-- Monitor when close enough, then drop
+	local connection
+	connection = humanoid.MoveToFinished:Connect(function(reached)
+		if reached then
+			connection:Disconnect()
+			local finalPos = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 5, hitbox.Position.Z)
+			hrp.CFrame = CFrame.new(finalPos)
+		end
+	end)
 end
 
--- Create circular button over each DeliveryHitbox
+-- Create circular buttons above each DeliveryHitbox
 local function createButton(hitbox)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 40, 0, 40)
@@ -45,8 +52,8 @@ local function createButton(hitbox)
 	button.ZIndex = 10
 	button.Name = "DeliveryButton"
 
-	local outline = Instance.new("UICorner", button)
-	outline.CornerRadius = UDim.new(1, 0)
+	local corner = Instance.new("UICorner", button)
+	corner.CornerRadius = UDim.new(1, 0)
 
 	button.MouseButton1Click:Connect(function()
 		selectedHitbox = hitbox
@@ -56,7 +63,6 @@ local function createButton(hitbox)
 		button.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
 	end)
 
-	-- Keep button above the hitbox
 	RunService.RenderStepped:Connect(function()
 		if hitbox and hitbox:IsDescendantOf(workspace) then
 			local screenPos, onScreen = camera:WorldToViewportPoint(hitbox.Position + Vector3.new(0, 3, 0))
@@ -72,17 +78,17 @@ local function createButton(hitbox)
 	table.insert(buttons, button)
 end
 
--- Scan for DeliveryHitboxes
+-- Find and create buttons for all DeliveryHitbox parts
 for _, obj in pairs(workspace:GetDescendants()) do
 	if obj:IsA("BasePart") and obj.Name == "DeliveryHitbox" then
 		createButton(obj)
 	end
 end
 
--- Key press listener
+-- T key to trigger movement
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
-		skyAndWalkTo(selectedHitbox)
+		skyWalkTo(selectedHitbox)
 	end
 end)
