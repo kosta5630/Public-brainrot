@@ -11,49 +11,43 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Force player to float at Y=50 while walking to destination
+-- Keep player in the air and walk toward hitbox
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or not hrp then return end
+	local humanoid = character:WaitForChild("Humanoid")
 
-	-- Teleport to same X/Z at Y = 50
-	local startCFrame = CFrame.new(hrp.Position.X, 50, hrp.Position.Z)
-	hrp.CFrame = startCFrame
+	-- Force Y = 50
+	local startPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
+	hrp.CFrame = CFrame.new(startPos)
 
-	task.wait(0.1)
-
-	-- Start moving toward the DeliveryHitbox X/Z
 	local targetXZ = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
+	local dropTarget = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 5, hitbox.Position.Z)
+
+	local walking = true
+
+	-- Move toward XZ target
 	humanoid:MoveTo(targetXZ)
 
-	-- While walking, keep Y = 50 locked manually every frame
-	local walking = true
-	local heartbeatConn
-	heartbeatConn = RunService.Heartbeat:Connect(function()
-		if not walking then
-			heartbeatConn:Disconnect()
-			return
-		end
+	-- Force stay in air + monitor distance
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		if not character or not character.Parent then conn:Disconnect() return end
 
-		-- Maintain sky height
 		local currentPos = hrp.Position
-		hrp.Velocity = Vector3.zero -- stop gravity pull
-		hrp.CFrame = CFrame.new(currentPos.X, 50, currentPos.Z, hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+		local lockedPos = Vector3.new(currentPos.X, 50, currentPos.Z)
+		hrp.CFrame = CFrame.new(lockedPos, targetXZ) -- face target
 
-		-- Check distance to target X/Z
-		local horizontalDist = (Vector3.new(currentPos.X, 0, currentPos.Z) - Vector3.new(hitbox.Position.X, 0, hitbox.Position.Z)).Magnitude
-		if horizontalDist <= 2 then
-			walking = false
-			task.wait(0.1)
-			-- Drop down to hitbox
-			hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, 5, 0))
+		local horizontalDistance = (Vector3.new(currentPos.X, 0, currentPos.Z) - Vector3.new(targetXZ.X, 0, targetXZ.Z)).Magnitude
+
+		if horizontalDistance <= 2 then
+			conn:Disconnect()
+			humanoid:MoveTo(dropTarget)
 		end
 	end)
 end
 
--- Create circular buttons
+-- Create selection buttons over each DeliveryHitbox
 local function createButton(hitbox)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 40, 0, 40)
@@ -94,7 +88,17 @@ local function createButton(hitbox)
 	table.insert(buttons, button)
 end
 
--- Find all DeliveryHitboxes
+-- Setup buttons for all DeliveryHitboxes
 for _, obj in pairs(workspace:GetDescendants()) do
 	if obj:IsA("BasePart") and obj.Name == "DeliveryHitbox" then
 		createButton(obj)
+	end
+end
+
+-- Press T to start sky-walk to selected hitbox
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
+		skyWalkTo(selectedHitbox)
+	end
+end)
