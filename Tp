@@ -18,7 +18,7 @@ local function skyAndWalkTo(hitbox)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 
 	-- Send to the sky
-	local skyPos = hrp.Position + Vector3.new(0, 70, 0)
+	local skyPos = hrp.Position + Vector3.new(0, 30, 0)
 	hrp.CFrame = CFrame.new(skyPos)
 
 	task.wait(0.5) -- short delay before moving down
