@@ -1,0 +1,86 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "DeliveryHitboxUI"
+gui.ResetOnSpawn = false
+
+local selectedHitbox = nil
+local buttons = {}
+
+-- Freeze movement
+local function freezePlayer(duration)
+	local char = player.Character or player.CharacterAdded:Wait()
+	local humanoid = char:WaitForChild("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+		task.delay(duration, function()
+			humanoid.WalkSpeed = 16
+			humanoid.JumpPower = 50
+		end)
+	end
+end
+
+-- Create circular button for each DeliveryHitbox
+local function createButton(hitbox)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0, 40, 0, 40)
+	button.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+	button.BackgroundTransparency = 0.2
+	button.Text = ""
+	button.BorderSizePixel = 0
+	button.AnchorPoint = Vector2.new(0.5, 0.5)
+	button.AutoButtonColor = true
+	button.ClipsDescendants = true
+	button.Parent = gui
+	button.ZIndex = 10
+	button.Name = "DeliveryButton"
+
+	local outline = Instance.new("UICorner", button)
+	outline.CornerRadius = UDim.new(1, 0)
+
+	button.MouseButton1Click:Connect(function()
+		selectedHitbox = hitbox
+		for _, b in pairs(buttons) do
+			b.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+		end
+		button.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+	end)
+
+	-- Keep button above the hitbox
+	RunService.RenderStepped:Connect(function()
+		if hitbox and hitbox:IsDescendantOf(workspace) then
+			local screenPos, onScreen = camera:WorldToViewportPoint(hitbox.Position + Vector3.new(0, 3, 0))
+			button.Visible = onScreen
+			if onScreen then
+				button.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
+			end
+		else
+			button.Visible = false
+		end
+	end)
+
+	table.insert(buttons, button)
+end
+
+-- Scan for all DeliveryHitboxes
+for _, obj in pairs(workspace:GetDescendants()) do
+	if obj:IsA("BasePart") and obj.Name == "DeliveryHitbox" then
+		createButton(obj)
+	end
+end
+
+-- T key to teleport to selected one
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
+		local char = player.Character or player.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		hrp.CFrame = selectedHitbox.CFrame + Vector3.new(0, 5, 0)
+		freezePlayer(3)
+	end
+end)
