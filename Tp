@@ -48,7 +48,7 @@ local function skyWalkTo(hitbox)
 			hrp.CFrame = hrp.CFrame + (direction * moveDelta)
 		else
 			-- Reached sky position above hitbox, drop down a bit above it
-			hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, 5, 0))
+			hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, 0, 0))
 			hrp.Anchored = oldAnchored
 			conn:Disconnect()
 		end
