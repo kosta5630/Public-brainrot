@@ -47,10 +47,15 @@ local function skyWalkTo(hitbox)
 			local moveDelta = math.min(speed * dt, distance)
 			hrp.CFrame = hrp.CFrame + (direction * moveDelta)
 		else
-			-- Reached sky position above hitbox, drop down a bit above it
-			hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, 0, 0))
-			hrp.Anchored = oldAnchored
+			-- Reached sky position above hitbox, drop down smoothly
 			conn:Disconnect()
+			hrp.Anchored = false -- unanchor before moving
+
+			local dropPos = hitbox.Position + Vector3.new(0, 5, 0)
+			humanoid:MoveTo(dropPos)
+
+			-- Wait until humanoid reaches drop position
+			humanoid.MoveToFinished:Wait()
 		end
 	end)
 end
