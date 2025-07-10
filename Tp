@@ -11,14 +11,13 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Move player to sky and walk toward hitbox while in air
+-- Move player to sky and walk toward hitbox while in air, then drop smoothly
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or not hrp then return end
 
-	-- Anchor the HRP to prevent gravity pull
 	local oldAnchored = hrp.Anchored
 	hrp.Anchored = true
 
@@ -26,11 +25,9 @@ local function skyWalkTo(hitbox)
 	local skyStartPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
 	hrp.CFrame = CFrame.new(skyStartPos)
 
-	-- Define target at sky level (same height)
 	local targetSkyPos = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
-
-	-- Smoothly move toward target in air
 	local speed = 50 -- studs per second
+
 	local conn
 	conn = RunService.Heartbeat:Connect(function(dt)
 		if not character or not hrp or not humanoid or not hitbox then
@@ -40,22 +37,36 @@ local function skyWalkTo(hitbox)
 		end
 
 		local currentPos = hrp.Position
-		local direction = (targetSkyPos - currentPos)
-		local distance = direction.Magnitude
-		if distance > 1 then
-			direction = direction.Unit
-			local moveDelta = math.min(speed * dt, distance)
-			hrp.CFrame = hrp.CFrame + (direction * moveDelta)
+		local horizontalTarget = Vector3.new(targetSkyPos.X, currentPos.Y, targetSkyPos.Z)
+		local horizontalDir = (horizontalTarget - currentPos)
+		local horizontalDist = horizontalDir.Magnitude
+
+		if horizontalDist > 1 then
+			-- Move horizontally toward targetSkyPos
+			local moveDelta = math.min(speed * dt, horizontalDist)
+			hrp.CFrame = hrp.CFrame + horizontalDir.Unit * moveDelta
 		else
-			-- Reached sky position above hitbox, drop down smoothly
+			-- Horizontal reached, now drop down smoothly
 			conn:Disconnect()
-			hrp.Anchored = false -- unanchor before moving
 
-			local dropPos = hitbox.Position + Vector3.new(0, 5, 0)
-			humanoid:MoveTo(dropPos)
+			local dropStartY = hrp.Position.Y
+			local dropEndY = hitbox.Position.Y + 5
+			local dropDuration = (dropStartY - dropEndY) / speed
+			local elapsed = 0
 
-			-- Wait until humanoid reaches drop position
-			humanoid.MoveToFinished:Wait()
+			-- New connection to handle drop
+			local dropConn
+			dropConn = RunService.Heartbeat:Connect(function(dropDt)
+				elapsed = elapsed + dropDt
+				local alpha = math.clamp(elapsed / dropDuration, 0, 1)
+				local newY = dropStartY - alpha * (dropStartY - dropEndY)
+				hrp.CFrame = CFrame.new(hrp.Position.X, newY, hrp.Position.Z)
+
+				if alpha >= 1 then
+					dropConn:Disconnect()
+					hrp.Anchored = oldAnchored
+				end
+			end)
 		end
 	end)
 end
