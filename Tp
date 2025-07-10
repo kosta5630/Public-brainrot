@@ -11,33 +11,45 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Send player to Y = 50 and walk toward the target
+-- Move player to sky and walk toward hitbox while in air
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or not hrp or not hitbox then return end
+	if not humanoid or not hrp then return end
 
-	-- Send to Y = 50, same X/Z
-	local skyPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
-	hrp.CFrame = CFrame.new(skyPos)
+	-- Go to sky (Y = 50) but same X/Z
+	local skyStartPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
+	hrp.CFrame = CFrame.new(skyStartPos)
 
-	-- Walk toward hitbox X/Z at same Y height
-	local targetXZ = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
-	humanoid:MoveTo(targetXZ)
+	task.wait(0.1)
 
-	-- Monitor when close enough, then drop
-	local connection
-	connection = humanoid.MoveToFinished:Connect(function(reached)
-		if reached then
-			connection:Disconnect()
-			local finalPos = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 5, hitbox.Position.Z)
-			hrp.CFrame = CFrame.new(finalPos)
+	-- Target sky-level X/Z of the hitbox
+	local targetSkyPos = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
+	humanoid:MoveTo(targetSkyPos)
+
+	-- Monitor until player gets close, then drop down
+	local reached = false
+	local checkConn
+	checkConn = RunService.Heartbeat:Connect(function()
+		if not character or not hrp or not humanoid or not hitbox then
+			checkConn:Disconnect()
+			return
+		end
+
+		local horizontalDistance = (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(hitbox.Position.X, 0, hitbox.Position.Z)).Magnitude
+
+		if horizontalDistance < 3 and not reached then
+			reached = true
+			checkConn:Disconnect()
+
+			local finalDrop = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 5, hitbox.Position.Z)
+			hrp.CFrame = CFrame.new(finalDrop)
 		end
 	end)
 end
 
--- Create circular buttons above each DeliveryHitbox
+-- Create button for each DeliveryHitbox
 local function createButton(hitbox)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 40, 0, 40)
@@ -78,14 +90,14 @@ local function createButton(hitbox)
 	table.insert(buttons, button)
 end
 
--- Find and create buttons for all DeliveryHitbox parts
+-- Initialize buttons for all DeliveryHitboxes
 for _, obj in pairs(workspace:GetDescendants()) do
 	if obj:IsA("BasePart") and obj.Name == "DeliveryHitbox" then
 		createButton(obj)
 	end
 end
 
--- T key to trigger movement
+-- Handle key press for teleport
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
