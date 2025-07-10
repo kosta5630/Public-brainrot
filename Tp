@@ -50,7 +50,7 @@ local function skyWalkTo(hitbox)
 			conn:Disconnect()
 
 			local dropStartY = hrp.Position.Y
-			local dropEndY = hitbox.Position.Y + 5
+			local dropEndY = hitbox.Position.Y - 5
 			local dropDuration = (dropStartY - dropEndY) / speed
 			local elapsed = 0
 
