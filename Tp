@@ -11,23 +11,36 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Walk in the sky toward hitbox using Humanoid:MoveTo(), then walk down
+-- Walk in the sky using invisible platform, then walk down to the hitbox
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or not hrp then return end
 
-	-- Move to sky level instantly (same X/Z, Y=50)
-	local startSkyPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
-	hrp.CFrame = CFrame.new(startSkyPos)
+	-- Create invisible platform so the player can walk in the sky
+	local skyPlatform = Instance.new("Part")
+	skyPlatform.Size = Vector3.new(10, 1, 10)
+	skyPlatform.Position = Vector3.new(hrp.Position.X, 49.5, hrp.Position.Z)
+	skyPlatform.Anchored = true
+	skyPlatform.CanCollide = true
+	skyPlatform.Transparency = 1
+	skyPlatform.Name = "SkyWalkPlatform"
+	skyPlatform.Parent = workspace
 
-	-- Walk toward hitbox in the sky
+	-- Move character to sky platform level (Y = 50)
+	local skyStartPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
+	hrp.CFrame = CFrame.new(skyStartPos)
+
+	-- Walk to target X/Z in the sky
 	local targetSkyPos = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
 	humanoid:MoveTo(targetSkyPos)
 	humanoid.MoveToFinished:Wait()
 
-	-- Now walk downward to the hitbox (land slightly above)
+	-- Remove sky platform before dropping
+	skyPlatform:Destroy()
+
+	-- Walk downward to hitbox
 	local dropTarget = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 2, hitbox.Position.Z)
 	humanoid:MoveTo(dropTarget)
 	humanoid.MoveToFinished:Wait()
