@@ -11,56 +11,42 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Exploit-style sky walk: anchored CFrame movement, then drop
+-- Sky walk with invisible platform + normal walking + drop
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not hrp or not humanoid then return end
+	if not humanoid or not hrp then return end
 
-	-- Anchor player to walk in air
-	hrp.Anchored = true
+	-- Create invisible anchored platform at Y = 49.5
+	local platform = Instance.new("Part")
+	platform.Size = Vector3.new(20, 1, 20)
+	platform.Position = Vector3.new(hrp.Position.X, 49.5, hrp.Position.Z)
+	platform.Anchored = true
+	platform.CanCollide = true
+	platform.Transparency = 1
+	platform.Name = "SkyWalkPlatform"
+	platform.Parent = workspace
 
-	-- Send player to sky position
-	local skyY = 50
-	hrp.CFrame = CFrame.new(hrp.Position.X, skyY, hrp.Position.Z)
+	-- Move player on top of the platform
+	local startSkyPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
+	hrp.CFrame = CFrame.new(startSkyPos)
 
-	local speed = 30
-	local targetXZ = Vector3.new(hitbox.Position.X, skyY, hitbox.Position.Z)
-	local moving = true
+	-- Walk to hitbox X/Z at Y = 50
+	local skyTarget = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
+	humanoid:MoveTo(skyTarget)
+	humanoid.MoveToFinished:Wait()
 
-	local conn
-	conn = RunService.Heartbeat:Connect(function(dt)
-		if not character or not hrp or not hitbox or not moving then
-			conn:Disconnect()
-			return
-		end
+	-- Remove the fake platform
+	platform:Destroy()
 
-		local direction = (targetXZ - hrp.Position)
-		direction = Vector3.new(direction.X, 0, direction.Z)
-		local distance = direction.Magnitude
-
-		if distance > 1 then
-			local move = direction.Unit * speed * dt
-			hrp.CFrame = hrp.CFrame + move
-		else
-			-- Reached target XZ position
-			moving = false
-			conn:Disconnect()
-
-			-- Unanchor and drop
-			hrp.Anchored = false
-			task.wait(0.1)
-
-			-- Drop to target
-			local dropTarget = hitbox.Position + Vector3.new(0, 2, 0)
-			humanoid:MoveTo(dropTarget)
-			humanoid.MoveToFinished:Wait()
-		end
-	end)
+	-- Now walk down to the delivery hitbox
+	local dropTarget = hitbox.Position + Vector3.new(0, 2, 0)
+	humanoid:MoveTo(dropTarget)
+	humanoid.MoveToFinished:Wait()
 end
 
--- Create button for each DeliveryHitbox
+-- Create a button for each DeliveryHitbox
 local function createButton(hitbox)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 40, 0, 40)
@@ -108,7 +94,7 @@ for _, obj in pairs(workspace:GetDescendants()) do
 	end
 end
 
--- Handle key press to trigger sky walk
+-- Trigger walk on keypress (T)
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
