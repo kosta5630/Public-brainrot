@@ -11,43 +11,29 @@ gui.ResetOnSpawn = false
 local selectedHitbox = nil
 local buttons = {}
 
--- Keep player in the air and walk toward hitbox
+-- Walk in the sky toward hitbox using Humanoid:MoveTo(), then walk down
 local function skyWalkTo(hitbox)
 	local character = player.Character or player.CharacterAdded:Wait()
 	local hrp = character:WaitForChild("HumanoidRootPart")
-	local humanoid = character:WaitForChild("Humanoid")
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or not hrp then return end
 
-	-- Force Y = 50
-	local startPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
-	hrp.CFrame = CFrame.new(startPos)
+	-- Move to sky level instantly (same X/Z, Y=50)
+	local startSkyPos = Vector3.new(hrp.Position.X, 50, hrp.Position.Z)
+	hrp.CFrame = CFrame.new(startSkyPos)
 
-	local targetXZ = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
-	local dropTarget = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 5, hitbox.Position.Z)
+	-- Walk toward hitbox in the sky
+	local targetSkyPos = Vector3.new(hitbox.Position.X, 50, hitbox.Position.Z)
+	humanoid:MoveTo(targetSkyPos)
+	humanoid.MoveToFinished:Wait()
 
-	local walking = true
-
-	-- Move toward XZ target
-	humanoid:MoveTo(targetXZ)
-
-	-- Force stay in air + monitor distance
-	local conn
-	conn = RunService.Heartbeat:Connect(function()
-		if not character or not character.Parent then conn:Disconnect() return end
-
-		local currentPos = hrp.Position
-		local lockedPos = Vector3.new(currentPos.X, 50, currentPos.Z)
-		hrp.CFrame = CFrame.new(lockedPos, targetXZ) -- face target
-
-		local horizontalDistance = (Vector3.new(currentPos.X, 0, currentPos.Z) - Vector3.new(targetXZ.X, 0, targetXZ.Z)).Magnitude
-
-		if horizontalDistance <= 2 then
-			conn:Disconnect()
-			humanoid:MoveTo(dropTarget)
-		end
-	end)
+	-- Now walk downward to the hitbox (land slightly above)
+	local dropTarget = Vector3.new(hitbox.Position.X, hitbox.Position.Y + 2, hitbox.Position.Z)
+	humanoid:MoveTo(dropTarget)
+	humanoid.MoveToFinished:Wait()
 end
 
--- Create selection buttons over each DeliveryHitbox
+-- Create button for each DeliveryHitbox
 local function createButton(hitbox)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 40, 0, 40)
@@ -88,14 +74,14 @@ local function createButton(hitbox)
 	table.insert(buttons, button)
 end
 
--- Setup buttons for all DeliveryHitboxes
+-- Initialize buttons for all DeliveryHitboxes
 for _, obj in pairs(workspace:GetDescendants()) do
 	if obj:IsA("BasePart") and obj.Name == "DeliveryHitbox" then
 		createButton(obj)
 	end
 end
 
--- Press T to start sky-walk to selected hitbox
+-- Handle key press to trigger sky walk
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.T and selectedHitbox then
